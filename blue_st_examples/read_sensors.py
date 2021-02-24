@@ -123,10 +123,10 @@ class MyFeatureListener(FeatureListener):
     #
     def on_update(self, feature, sample):
             print(feature)
-            # feature name : feature.get_name()
-            # Data are in : sample.get_data()
-            # Timestamp : sample.get_timestamp()
-            #TODO data output (fifo ?) : 
+
+            #TODO data output (fifo ? ZMQ ?) : 
+            timestamp = sample.get_timestamp()
+
             if feature.get_name() == "Temperature":
                 out_temp = sample.get_data()
             elif feature.get_name() == "Humidity":
