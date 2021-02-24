@@ -1,44 +1,5 @@
 #!/usr/bin/env python
 
-################################################################################
-# COPYRIGHT(c) 2018 STMicroelectronics                                         #
-#                                                                              #
-# Redistribution and use in source and binary forms, with or without           #
-# modification, are permitted provided that the following conditions are met:  #
-#   1. Redistributions of source code must retain the above copyright notice,  #
-#      this list of conditions and the following disclaimer.                   #
-#   2. Redistributions in binary form must reproduce the above copyright       #
-#      notice, this list of conditions and the following disclaimer in the     #
-#      documentation and/or other materials provided with the distribution.    #
-#   3. Neither the name of STMicroelectronics nor the names of its             #
-#      contributors may be used to endorse or promote products derived from    #
-#      this software without specific prior written permission.                #
-#                                                                              #
-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"  #
-# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE    #
-# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE   #
-# ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE    #
-# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR          #
-# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF         #
-# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS     #
-# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN      #
-# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)      #
-# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE   #
-# POSSIBILITY OF SUCH DAMAGE.                                                  #
-################################################################################
-
-################################################################################
-# Author:  Davide Aliprandi, STMicroelectronics                                #
-################################################################################
-
-
-# DESCRIPTION
-#
-# This application example shows how to perform a Bluetooth Low Energy (BLE)
-# scan, connect to a device, retrieve its exported features, and get push
-# notifications from it.
-
-
 # IMPORT
 
 from __future__ import print_function
@@ -67,16 +28,18 @@ from blue_st_sdk.features.audio.adpcm.feature_audio_adpcm_sync import FeatureAud
 # CONSTANTS
 
 # Presentation message.
-INTRO = """##################
-# BlueST Example #
-##################"""
+INTRO = """##############
+# Start Gyro #   
+##############"""
 
 # Bluetooth Scanning time in seconds (optional).
 SCANNING_TIME_s = 2 #5
 
-# Number of notifications to get before disabling them.
-NOTIFICATIONS = 10
+# Mac adress to auto connect
+MAC_AUTO_CONNEXION = "cd:26:fb:e4:6d:f1"
 
+# Feature to auto start : "Temperature", "Humidity", "Pressure", "Magnetometer", "Gyroscope", "Accelerometer", "Proximity", "Audio & Sync", "Switch"
+FEATURE_AUTO_START = ["Gyroscope", "Proximity"] #  or ["Temperature", "Humidity", "Pressure"] or [] to use manualy
 
 # FUNCTIONS
 
@@ -102,7 +65,7 @@ class MyManagerListener(ManagerListener):
     # @param enabled True if a new discovery starts, False otherwise.
     #
     def on_discovery_change(self, manager, enabled):
-        print('Discovery %s.' % ('started' if enabled else 'stopped'))
+        print('[+] Discovery %s.' % ('started' if enabled else 'stopped'))
         if not enabled:
             print()
 
@@ -113,7 +76,7 @@ class MyManagerListener(ManagerListener):
     # @param node    New node discovered.
     #
     def on_node_discovered(self, manager, node):
-        print('New device discovered: %s.' % (node.get_name()))
+        print('[+] New device discovered: %s.' % (node.get_name()))
 
 
 #
@@ -128,7 +91,7 @@ class MyNodeListener(NodeListener):
     # @param node Node that has connected to a host.
     #
     def on_connect(self, node):
-        print('Device %s connected.' % (node.get_name()))
+        print('[+] Device %s connected.' % (node.get_name()))
 
     #
     # To be called whenever a node disconnects from a host.
@@ -138,11 +101,11 @@ class MyNodeListener(NodeListener):
     #                   (called by the user).
     #
     def on_disconnect(self, node, unexpected=False):
-        print('Device %s disconnected%s.' % \
+        print('[+] Device %s disconnected%s.' % \
             (node.get_name(), ' unexpectedly' if unexpected else ''))
         if unexpected:
             # Exiting.
-            print('\nExiting...\n')
+            print('\n[+] Exiting...\n')
             sys.exit(0)
 
 
@@ -152,9 +115,6 @@ class MyNodeListener(NodeListener):
 #
 class MyFeatureListener(FeatureListener):
 
-    _notifications = 0
-    """Counting notifications to print only the desired ones."""
-
     #
     # To be called whenever the feature updates its data.
     #
@@ -162,9 +122,35 @@ class MyFeatureListener(FeatureListener):
     # @param sample  Data extracted from the feature.
     #
     def on_update(self, feature, sample):
-        if self._notifications < NOTIFICATIONS:
-            self._notifications += 1
             print(feature)
+            # feature name : feature.get_name()
+            # Data are in : sample.get_data()
+            # Timestamp : sample.get_timestamp()
+            #TODO data output (fifo ?) : 
+            if feature.get_name() == "Temperature":
+                out_temp = sample.get_data()
+            elif feature.get_name() == "Humidity":
+                out_temp = sample.get_data()
+            elif feature.get_name() == "Pressure":
+                out_temp = sample.get_data()
+            elif feature.get_name() == "Magnetometer":
+                out_temp_x = sample.get_data()[0]
+                out_temp_y = sample.get_data()[1]
+                out_temp_z = sample.get_data()[2]
+            elif feature.get_name() == "Gyroscope":
+                out_temp_x = sample.get_data()[0]
+                out_temp_y = sample.get_data()[1]
+                out_temp_z = sample.get_data()[2]
+            elif feature.get_name() == "Accelerometer":
+                out_temp_x = sample.get_data()[0]
+                out_temp_y = sample.get_data()[1]
+                out_temp_z = sample.get_data()[2]
+            elif feature.get_name() == "Proximity":
+                out_temp = sample.get_data()
+            elif feature.get_name() == "Audio & Sync":
+                pass
+            elif feature.get_name() == "Switch":
+                pass
 
 
 # MAIN APPLICATION
@@ -184,91 +170,109 @@ def main(argv):
         manager.add_listener(manager_listener)
 
         while True:
-            # Synchronous discovery of Bluetooth devices.
-            print('Scanning Bluetooth devices...\n')
-            manager.discover(SCANNING_TIME_s)
+            discovered_devices_once = []
+            no_connect = True
+            no_feature_select = True
+            feature_selected = []
 
-            # Alternative 1: Asynchronous discovery of Bluetooth devices.
-            #manager.discover(SCANNING_TIME_s, True)
+            # Asynchronous discovery of Bluetooth devices.
+            print('[+] Scanning Bluetooth devices...\n')
+            manager.start_discovery()
+            timeout = time.time() + SCANNING_TIME_s
+            while no_connect:
+                time.sleep(0.01)
 
-            # Alternative 2: Asynchronous discovery of Bluetooth devices.
-            #manager.start_discovery()
-            #time.sleep(SCANNING_TIME_s)
-            #manager.stop_discovery()
+                # Getting discovered devices.
+                discovered_devices = manager.get_nodes()
 
-            # Getting discovered devices.
-            discovered_devices = manager.get_nodes()
-
-            # Listing discovered devices.
-            if not discovered_devices:
-                print('No Bluetooth devices found. Exiting...\n')
-                sys.exit(0)
-            print('Available Bluetooth devices:')
-            i = 1
-            for device in discovered_devices:
-                print('%d) %s: [%s]' % (i, device.get_name(), device.get_tag()))
-                i += 1
+                i = 1
+                for device in discovered_devices:
+                    if device.get_tag() not in discovered_devices_once: 
+                        print('[+] %s: [%s]' % (device.get_name(), device.get_tag()))
+                        discovered_devices_once.append(device.get_tag())
+                        # Autoconnection management
+                        if device.get_tag() == MAC_AUTO_CONNEXION:
+                            print('[+] Device MAC address match')
+                            no_connect = False
+                            choice = i
+                        i += 1
+                # Timeout management
+                if time.time() > timeout:
+                    break
+            manager.stop_discovery()
 
             # Selecting a device.
-            while True:
-                choice = int(
-                    input("\nSelect a device to connect to (\'0\' to quit): "))
+            while no_connect:
+                print('[+] Available Bluetooth devices:')
+                i = 1
+                for device in discovered_devices:
+                    print('[+] %d) %s: [%s]' % (i, device.get_name(), device.get_tag()))
+                    i += 1
+                choice = int(input("\nSelect a device to connect to (\'0\' to quit): "))
                 if choice >= 0 and choice <= len(discovered_devices):
-                    break
+                    no_connect = False
             if choice == 0:
                 # Exiting.
                 manager.remove_listener(manager_listener)
-                print('Exiting...\n')
+                print('[+] Exiting...\n')
                 sys.exit(0)
             device = discovered_devices[choice - 1]
             node_listener = MyNodeListener()
             device.add_listener(node_listener)
 
             # Connecting to the device.
-            print('Connecting to %s...' % (device.get_name()))
+            print('[+] Connecting to %s...' % (device.get_name()))
             if not device.connect():
-                print('Connection failed.\n')
+                print('[+] Connection failed.\n')
                 continue
 
             while True:
                 # Getting features.
                 features = device.get_features()
-                print('\nFeatures:')
+                print('\n[+] Features:')
                 i = 1
                 for feature in features:
+                    if feature.get_name() in FEATURE_AUTO_START:
+                        print('[+] Feature matching - %s' % (feature.get_name()))
+                        choice = i
+                        feature_selected.append(i)
+                        no_feature_select = False
+
                     if isinstance(feature, FeatureAudioADPCM):
                         audio_feature = feature
-                        print('%d,%d) %s' % (i,i+1, "Audio & Sync"))
+                        print('[+] %d,%d) %s' % (i,i+1, "Audio & Sync"))
                         i+=1
                     elif isinstance(feature, FeatureAudioADPCMSync):
                         audio_sync_feature = feature
                     else:
-                        print('%d) %s' % (i, feature.get_name()))
+                        print('[+] %d) %s' % (i, feature.get_name()))
                         i+=1
 
                 # Selecting a feature.
-                while True:
-                    choice = int(input('\nSelect a feature '
-                                       '(\'0\' to disconnect): '))
+                while no_feature_select:
+                    choice = int(input('\nSelect a feature ''(\'0\' to disconnect): '))
                     if choice >= 0 and choice <= len(features):
-                        break
-                if choice == 0:
+                        feature_selected.append(choice)
+                        no_feature_select = False
+                        
+                if len(feature_selected) == 0:
                     # Disconnecting from the device.
-                    print('\nDisconnecting from %s...' % (device.get_name()))
+                    print('\n[+] Disconnecting from %s...' % (device.get_name()))
                     if not device.disconnect():
-                        print('Disconnection failed.\n')
+                        print('[+] Disconnection failed.\n')
                         continue
                     device.remove_listener(node_listener)
                     # Resetting discovery.
                     manager.reset_discovery()
                     # Going back to the list of devices.
                     break
-                feature = features[choice - 1]
 
-                # Enabling notifications.
-                feature_listener = MyFeatureListener()
-                feature.add_listener(feature_listener)
-                device.enable_notifications(feature)
+                for feature_id in feature_selected:
+                    feature = features[feature_id - 1]
+                    # Enabling notifications.
+                    feature_listener = MyFeatureListener()  
+                    feature.add_listener(feature_listener)
+                    device.enable_notifications(feature)
 
                 # Handling audio case (both audio features have to be enabled).
                 if isinstance(feature, FeatureAudioADPCM):
@@ -281,11 +285,11 @@ def main(argv):
                     device.enable_notifications(audio_feature)
 
                 # Getting notifications.
-                notifications = 0
-                while notifications < NOTIFICATIONS:
-                    if device.wait_for_notifications(0.05):
-                        notifications += 1
+                while True:
+                    device.wait_for_notifications(10)
+                    #TODO break management
 
+                # TODO : clean disabling (array of feature/feature_listener)
                 # Disabling notifications.
                 device.disable_notifications(feature)
                 feature.remove_listener(feature_listener)
@@ -301,7 +305,7 @@ def main(argv):
     except KeyboardInterrupt:
         try:
             # Exiting.
-            print('\nExiting...\n')
+            print('\n[+] Exiting...\n')
             sys.exit(0)
         except SystemExit:
             os._exit(0)
